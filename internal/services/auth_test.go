@@ -19,10 +19,8 @@ func TestAuthenticate(t *testing.T) {
 	userRepo := repositories.NewUserRepository(db)
 	service := NewAuthService(userRepo)
 
-	// Устанавливаем тестовый JWT-секрет перед тестами
 	auth.SetJWTSecret([]byte("test_secret_key"))
 
-	// Хешируем тестовый пароль
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("12345"), bcrypt.DefaultCost)
 
 	tests := []struct {

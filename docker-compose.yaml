@@ -1,4 +1,5 @@
-version: "3.8"
+version: '3.8'
+
 services:
   app:
     build: .
@@ -6,11 +7,25 @@ services:
       - "8080:8080"
     depends_on:
       - db
-  db:
-    image: postgres:15
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: avito_shop
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=your_password
+      - DB_NAME=avito_shop
+      - DB_SSLMODE=disable
+      - JWT_SECRET=your_very_secure_secret_key_32_bytes_long
+
+  db:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=your_password
+      - POSTGRES_DB=avito_shop
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
