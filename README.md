@@ -20,7 +20,7 @@
 ### Локальный запуск
 1. Склонируйте репозиторий:
    ```bash
-   git clone <github.com/itocode21/MerchServiceAvito>
+   git clone github.com/itocode21/MerchServiceAvito
    cd MerchServiceAvito
    ```
 2. Создайте файл ```.env``` в корне проекта по примеру ```.env.example```:
