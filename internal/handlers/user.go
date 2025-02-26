@@ -1,6 +1,11 @@
 package handlers
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/itocode21/MerchServiceAvito/internal/models"
 )
@@ -8,38 +13,42 @@ import (
 func (h *Handlers) GetInfo(c *gin.Context) {
 	username := c.MustGet("username").(string)
 
-	user, err := h.userService.GetUserByUsername(username)
-	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
-		return
-	}
-	if user == nil {
-		c.JSON(404, gin.H{"error": "Пользователь не найден"})
+	cacheKey := "user_info:" + username
+	cached, err := h.config.Redis.Get(context.Background(), cacheKey).Result()
+	if err == nil {
+		c.JSON(http.StatusOK, json.RawMessage(cached))
 		return
 	}
 
-	inventory, err := h.itemService.GetUserInventory(user.ID)
+	info, err := h.userService.GetUserInfo(username)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if info == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
 		return
 	}
 
-	transactions, err := h.transService.GetUserTransactions(user.ID)
-	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
-		return
-	}
-
+	// Формируем ответ
 	response := gin.H{
-		"coins":     user.Coins,
-		"inventory": inventory,
+		"coins":     info.Coins,
+		"inventory": info.InventoryJSON,
 		"coinHistory": gin.H{
-			"received": filterTransactions(transactions, user.ID, true),
-			"sent":     filterTransactions(transactions, user.ID, false),
+			"received": info.ReceivedJSON,
+			"sent":     info.SentJSON,
 		},
 	}
 
-	c.JSON(200, response)
+	responseJSON, err := json.Marshal(response)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to marshal response"})
+		return
+	}
+
+	// Сохраняем в кэш
+	h.config.Redis.Set(context.Background(), cacheKey, responseJSON, 5*time.Minute)
+	c.JSON(http.StatusOK, response)
 }
 
 func filterTransactions(transactions []models.Transaction, userID int, received bool) []gin.H {

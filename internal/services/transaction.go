@@ -1,6 +1,7 @@
 package services
 
 import (
+	"database/sql"
 	"fmt"
 
 	"github.com/itocode21/MerchServiceAvito/internal/models"
@@ -10,10 +11,15 @@ import (
 type TransactionService struct {
 	userRepo  *repositories.UserRepository
 	transRepo *repositories.TransactionRepository
+	db        *sql.DB
 }
 
 func NewTransactionService(userRepo *repositories.UserRepository, transRepo *repositories.TransactionRepository) *TransactionService {
-	return &TransactionService{userRepo: userRepo, transRepo: transRepo}
+	return &TransactionService{
+		userRepo:  userRepo,
+		transRepo: transRepo,
+		db:        userRepo.DB,
+	}
 }
 
 func (s *TransactionService) SendCoins(fromUsername, toUsername string, amount int) error {
@@ -21,38 +27,42 @@ func (s *TransactionService) SendCoins(fromUsername, toUsername string, amount i
 		return fmt.Errorf("сумма должна быть положительной")
 	}
 
-	fromUser, err := s.userRepo.GetUserByUsername(fromUsername)
-	if err != nil {
-		return fmt.Errorf("ошибка получения отправителя: %v", err)
-	}
-	if fromUser == nil {
-		return fmt.Errorf("отправитель %s не найден", fromUsername)
-	}
-
-	toUser, err := s.userRepo.GetUserByUsername(toUsername)
-	if err != nil {
-		return fmt.Errorf("ошибка получения получателя: %v", err)
-	}
-	if toUser == nil {
-		return fmt.Errorf("получатель %s не найден", toUsername)
-	}
-
-	if fromUser.Coins < amount {
-		return fmt.Errorf("недостаточно монет у %s: %d < %d", fromUsername, fromUser.Coins, amount)
-	}
-
-	tx, err := s.userRepo.DB.Begin()
+	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("ошибка начала транзакции: %v", err)
 	}
 	defer tx.Rollback()
 
-	fromUser.Coins -= amount
+	var fromUserID, fromUserCoins int
+	err = tx.QueryRow("SELECT id, coins FROM users WHERE username = $1 FOR UPDATE", fromUsername).
+		Scan(&fromUserID, &fromUserCoins)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("отправитель %s не найден", fromUsername)
+		}
+		return fmt.Errorf("ошибка блокировки отправителя: %v", err)
+	}
+
+	var toUserID, toUserCoins int
+	err = tx.QueryRow("SELECT id, coins FROM users WHERE username = $1 FOR UPDATE", toUsername).
+		Scan(&toUserID, &toUserCoins)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("получатель %s не найден", toUsername)
+		}
+		return fmt.Errorf("ошибка блокировки получателя: %v", err)
+	}
+
+	if fromUserCoins < amount {
+		return fmt.Errorf("недостаточно монет у %s: %d < %d", fromUsername, fromUserCoins, amount)
+	}
+
+	fromUser := &models.User{ID: fromUserID, Coins: fromUserCoins - amount}
+	toUser := &models.User{ID: toUserID, Coins: toUserCoins + amount}
+
 	if err := s.userRepo.UpdateUserBalanceTx(tx, fromUser); err != nil {
 		return fmt.Errorf("ошибка обновления баланса отправителя: %v", err)
 	}
-
-	toUser.Coins += amount
 	if err := s.userRepo.UpdateUserBalanceTx(tx, toUser); err != nil {
 		return fmt.Errorf("ошибка обновления баланса получателя: %v", err)
 	}
