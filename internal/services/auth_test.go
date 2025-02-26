@@ -4,7 +4,9 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/go-redis/redis/v8"
 	"github.com/itocode21/MerchServiceAvito/internal/auth"
+	"github.com/itocode21/MerchServiceAvito/internal/config"
 	"github.com/itocode21/MerchServiceAvito/internal/repositories"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -16,7 +18,19 @@ func TestAuthenticate(t *testing.T) {
 	}
 	defer db.Close()
 
-	userRepo := repositories.NewUserRepository(db)
+	// заглушка для Redis
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+
+	// Config для тестов
+	cfg := &config.Config{
+		DB:        db,
+		JWTSecret: []byte("test_secret_key"),
+		Redis:     redisClient,
+	}
+
+	userRepo := repositories.NewUserRepository(cfg)
 	service := NewAuthService(userRepo)
 
 	auth.SetJWTSecret([]byte("test_secret_key"))

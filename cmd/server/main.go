@@ -13,39 +13,33 @@ import (
 )
 
 func main() {
-
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Ошибка загрузки конфигурации: %v", err)
 	}
 	defer cfg.Close()
 
-	userRepo := repositories.NewUserRepository(cfg.DB)
+	userRepo := repositories.NewUserRepository(cfg)
 	itemRepo := repositories.NewItemRepository(cfg.DB)
 	transRepo := repositories.NewTransactionRepository(cfg.DB)
 
-	userService := services.NewUserService(userRepo)
 	authService := services.NewAuthService(userRepo)
+	userService := services.NewUserService(userRepo)
 	itemService := services.NewItemService(itemRepo, userRepo)
 	transService := services.NewTransactionService(userRepo, transRepo)
 
 	auth.SetJWTSecret(cfg.JWTSecret)
 
-	h := handlers.NewHandlers(authService, userService, itemService, transService)
+	h := handlers.NewHandlers(cfg, authService, userService, itemService, transService)
 
 	r := gin.Default()
-
-	// Открытые эндпоинты(не требуют токен)
+	r.GET("/api/reset", h.ResetDB) // Добавленный эндпоинт для сброса
 	r.POST("/api/register", h.Register)
 	r.POST("/api/auth", h.Authenticate)
-
-	// Защищённые эндпоинты(требуют токен)
 	protected := r.Group("/api").Use(middleware.JWTAuthMiddleware())
-	{
-		protected.GET("/info", h.GetInfo)
-		protected.POST("/sendCoin", h.SendCoin)
-		protected.GET("/buy/:item", h.BuyItem)
-	}
+	protected.GET("/info", h.GetInfo)
+	protected.POST("/sendCoin", h.SendCoin)
+	protected.GET("/buy/:item", h.BuyItem)
 
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("Ошибка запуска сервера: %v", err)

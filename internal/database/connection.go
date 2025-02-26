@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
@@ -16,37 +17,50 @@ import (
 func NewDB() (*sql.DB, error) {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatalf("Ошибка загрузки .env файла: %v", err)
+		log.Printf("Ошибка загрузки .env файла: %v", err)
 	}
 
 	connStr := fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_PORT"),
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASSWORD"),
-		os.Getenv("DB_NAME"),
-		os.Getenv("DB_SSLMODE"),
+		os.Getenv("DB_HOST"), os.Getenv("DB_PORT"), os.Getenv("DB_USER"),
+		os.Getenv("DB_PASSWORD"), os.Getenv("DB_NAME"), os.Getenv("DB_SSLMODE"),
 	)
 	log.Printf("Подключаемся к базе: %s", connStr)
 
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		return nil, fmt.Errorf("Ошибка подключения к базе данных: %v", err)
+	var db *sql.DB
+	for i := 0; i < 10; i++ {
+		db, err = sql.Open("postgres", connStr)
+		if err != nil {
+			log.Printf("Ошибка открытия соединения: %v", err)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		if err = db.Ping(); err != nil {
+			log.Printf("Не удалось проверить соединение: %v", err)
+			db.Close()
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		log.Println("Соединение с базой успешно установлено")
+		log.Printf("Активных соединений после Ping: %d, максимум: %d", db.Stats().OpenConnections, db.Stats().MaxOpenConnections)
+
+		if err := applyMigrations(db); err != nil {
+			return nil, err
+		}
+
+		db.SetMaxOpenConns(1000)
+		db.SetMaxIdleConns(500)
+
+		log.Printf("Активных соединений после настройки пула: %d, максимум: %d", db.Stats().OpenConnections, db.Stats().MaxOpenConnections)
+
+		return db, nil
 	}
 
-	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("Не удалось проверить соединение: %v", err)
-	}
-	log.Println("Соединение с базой успешно установлено")
-
-	if err := applyMigrations(db); err != nil {
-		return nil, err
-	}
-
-	db.SetMaxOpenConns(50)
-	return db, nil
+	return nil, fmt.Errorf("не удалось подключиться к базе после 10 попыток: %v", err)
 }
+
 func applyMigrations(db *sql.DB) error {
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
@@ -89,5 +103,15 @@ func applyMigrations(db *sql.DB) error {
 		log.Println("Таблица users успешно создана")
 	}
 
+	return nil
+}
+
+func ResetDB(db *sql.DB) error {
+	_, err := db.Exec("TRUNCATE TABLE users, transactions, inventory RESTART IDENTITY")
+	if err != nil {
+		log.Printf("Ошибка очистки базы данных: %v", err)
+		return fmt.Errorf("ошибка очистки базы данных: %v", err)
+	}
+	log.Println("База данных успешно очищена")
 	return nil
 }

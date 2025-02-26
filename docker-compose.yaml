@@ -7,6 +7,7 @@ services:
       - "8080:8080"
     depends_on:
       - db
+      - redis
     environment:
       - DB_HOST=db
       - DB_PORT=5432
@@ -15,9 +16,12 @@ services:
       - DB_NAME=avito_shop
       - DB_SSLMODE=disable
       - JWT_SECRET=your_very_secure_secret_key_32_bytes_long
+      - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=your_redis_password
 
   db:
     image: postgres:13
+    command: -c max_connections=1500 -c shared_buffers=1GB -c effective_cache_size=3GB -c work_mem=32MB -c wal_buffers=16MB
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=your_password
@@ -26,6 +30,14 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    cpus: '4'
+    mem_limit: 8g
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass your_redis_password
 
 volumes:
   postgres_data:
