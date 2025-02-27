@@ -105,17 +105,17 @@ Avito Merch Service предоставляет REST API для сотрудни�
     ```text
     MerchServiceAvito/
     ├── cmd/
-    │   ├── server/             #Точка входа приложения
-    ├── internal/                # Основной код
-    │   ├── auth/               # Логика JWT
-    │   ├── config/            #Конфигурация
-    │   ├── database/        # Миграции
-    │   ├── handlers/        # HTTP-обработчики
-    │   ├── middleware/  # Middleware (JWT)
+    │   ├── server/         #Точка входа приложения
+    ├── internal/           # Основной код
+    │   ├── auth/           # Логика JWT
+    │   ├── config/         #Конфигурация
+    │   ├── database/       # Миграции
+    │   ├── handlers/       # HTTP-обработчики
+    │   ├── middleware/     # Middleware (JWT)
     │   ├── models/         # Структуры данных
-    │   ├── repositories/  # Работа с базой
+    │   ├── repositories/   # Работа с базой
     │   └── services/       # Бизнес-логика
-    ├── .env.example      # Пример переменных окружения
+    ├── .env.example        # Пример переменных окружения
     ├── docker-compose.yml  # Docker Compose конфигурация
     ├── Dockerfile          # Docker файл
     ├── Makefile            # Команды сборки и тестирования
