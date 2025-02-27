@@ -68,7 +68,7 @@ Avito Merch Service предоставляет REST API для сотрудни�
 Покрывают бизнес-логику сервисов (services/item.go, services/transaction.go, services/auth.go). Общее покрытие проекта > 40%.
 
    ```bash
-    make docker-down
+    test-unit
    ```
     
 ### E2E-тесты
