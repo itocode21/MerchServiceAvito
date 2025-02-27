@@ -33,6 +33,7 @@ Avito Merch Service предоставляет REST API для сотрудни�
    ```bash
    git clone https://github.com/itocode21/MerchServiceAvito.git
    cd MerchServiceAvito
+   ```
 2. Создайте файл ```.env ```в корне проекта по примеру ```.env.example```:
     ```env
     DB_HOST=db
